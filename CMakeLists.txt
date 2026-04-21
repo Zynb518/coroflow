@@ -36,6 +36,7 @@ target_sources(coroflow
         include/coroflow/EventNotifier.hpp
         include/coroflow/TimerQueue.hpp
 
+        include/coroflow/Task.hpp
 
 
 )

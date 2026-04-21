@@ -1,11 +1,15 @@
 #pragma once
 
+#include <coroflow/EventLoopThread.hpp>
+#include <vector>
+
 namespace coroflow {
 
 class EventLoopThreadPool {
-    public:
+public:
 
-    private:
+private:
+    std::vector<EventLoopThread> workerThreads;
 };
 
 }

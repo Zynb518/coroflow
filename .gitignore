@@ -1,0 +1,14 @@
+/.codex
+/.idea/
+
+/build/
+/cmake-build-*/
+
+/CMakeCache.txt
+/CMakeFiles/
+/cmake_install.cmake
+/compile_commands.json
+/Makefile
+/build.ninja
+/.ninja_deps
+/.ninja_log
