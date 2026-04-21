@@ -38,6 +38,8 @@ target_sources(coroflow
 
         include/coroflow/Task.hpp
 
+        include/coroflow/Result.hpp
+
 
 )
 
