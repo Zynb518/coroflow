@@ -68,6 +68,12 @@ public:
             int readyCount = waitResult.value();
             for (int i = 0; i < readyCount; ++i) {
                 int fd = epEvents[i].data.fd;
+                // 被唤醒，单独处理
+                if (fd == eventNotifier.fd()) {
+                    eventNotifier.handleRead();
+                    continue;
+                }
+
                 uint32_t revents = epEvents[i].events;
 
                 auto it = fdContexts.find(fd);
@@ -90,6 +96,7 @@ public:
 
     void stop() noexcept {
         running = false;
+        eventNotifier.notify();
     }
 
     // “epoll 永久订阅、协程一次性消费”
