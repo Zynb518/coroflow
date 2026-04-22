@@ -182,7 +182,7 @@ public:
 private:
     explicit EventLoop(Epoller &&epoller, EventNotifier &&notifier)
         : epoller(std::move(epoller)),
-          eventNotifier(notifier) {
+          eventNotifier(std::move(notifier)) {
     }
 private:
     Epoller epoller;

@@ -23,6 +23,8 @@ public:
             return Result<EventNotifier, std::error_code>::failure(
                 std::error_code(errno, std::generic_category()));
         }
+        return Result<EventNotifier, std::error_code>::success(
+            EventNotifier(fd));
     }
 
     ~EventNotifier() {
