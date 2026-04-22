@@ -488,3 +488,49 @@ extern uint32_t htonl (uint32_t __hostlong)
 extern uint16_t htons (uint16_t __hostshort)
      __THROW __attribute__ ((__const__));
 ```
+
+
+
+```cpp
+/* Creates an epoll instance.  Returns an fd for the new instance.
+   The "size" parameter is a hint specifying the number of file
+   descriptors to be associated with the new instance.  The fd
+   returned by epoll_create() should be closed with close().  */
+extern int epoll_create (int __size) __THROW;
+
+/* Same as epoll_create but with an FLAGS parameter.  The unused SIZE
+   parameter has been dropped.  */
+extern int epoll_create1 (int __flags) __THROW;
+```
+
+
+
+```cpp
+/* Manipulate an epoll instance "epfd". Returns 0 in case of success,
+   -1 in case of error ( the "errno" variable will contain the
+   specific error code ) The "op" parameter is one of the EPOLL_CTL_*
+   constants defined above. The "fd" parameter is the target of the
+   operation. The "event" parameter describes which events the caller
+   is interested in and any associated user data.  */
+extern int epoll_ctl (int __epfd, int __op, int __fd,
+		      struct epoll_event *__event) __THROW;
+```
+
+
+
+```cpp
+/* Wait for events on an epoll instance "epfd". Returns the number of
+   triggered events returned in "events" buffer. Or -1 in case of
+   error with the "errno" variable set to the specific error code. The
+   "events" parameter is a buffer that will contain triggered
+   events. The "maxevents" is the maximum number of events to be
+   returned ( usually size of "events" ). The "timeout" parameter
+   specifies the maximum wait time in milliseconds (-1 == infinite).
+
+   This function is a cancellation point and therefore not marked with
+   __THROW.  */
+extern int epoll_wait (int __epfd, struct epoll_event *__events,
+		       int __maxevents, int __timeout)
+	__attr_access ((__write_only__, 2, 3)) __nonnull ((2));
+```
+

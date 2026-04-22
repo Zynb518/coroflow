@@ -23,7 +23,7 @@ public:
 
         // 哪个协程暂停了，之后恢复哪个协程
         void await_suspend(std::coroutine_handle<> handle) noexcept {
-            loop.waitReadable(socket.fd(), handle);
+            mainLoop.waitReadable(socket.fd(), handle);
         }
 
         Result<int, std::error_code> await_resume() noexcept {
