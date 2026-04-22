@@ -568,3 +568,29 @@ extern ssize_t read (int __fd, void *__buf, size_t __nbytes) __wur
 
 
 EINTR 表示这次read 被信号打断了，重试即可；EAGAIN 表示在非阻塞模式下当前已经没有可读计数了
+
+
+
+```cpp
+/* Await a connection on socket FD.
+   When a connection arrives, open a new socket to communicate with it,
+   set *ADDR (which is *ADDR_LEN bytes long) to the address of the connecting
+   peer and *ADDR_LEN to the address's actual length, and return the
+   new socket's descriptor, or -1 for errors.
+
+   This function is a cancellation point and therefore not marked with
+   __THROW.  */
+extern int accept (int __fd, __SOCKADDR_ARG __addr,
+		   socklen_t *__restrict __addr_len);
+
+#ifdef __USE_GNU
+/* Similar to 'accept' but takes an additional parameter to specify flags.
+
+   This function is a cancellation point and therefore not marked with
+   __THROW.  */
+extern int accept4 (int __fd, __SOCKADDR_ARG __addr,
+		    socklen_t *__restrict __addr_len, int __flags);
+#endif
+```
+
+在非阻塞 socket 上调用 accept 时，如果当前没有可立即取出的新连接，系统不会像阻塞模式那样卡住等待，而是直接返回 -1，并把 errno 设成 EAGAIN 或 EWOULDBLOCK；这在语义上并不表示“真正出错了”，而是表示“现在暂时没有资源可取，稍后再试”

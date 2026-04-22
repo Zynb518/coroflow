@@ -74,6 +74,26 @@ public:
         return Result<void, std::error_code>::success();
     }
 
+    Result<int, std::error_code> accept() noexcept {
+        if (listen_fd == -1) {
+            return Result<int, std::error_code>::failure(
+                std::make_error_code(std::errc::bad_file_descriptor));
+        }
+
+        int connFd = ::accept4(listen_fd, nullptr, nullptr, SOCK_NONBLOCK | SOCK_CLOEXEC);
+        if (connFd == -1) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                return Result<int, std::error_code>::failure(
+                    std::make_error_code(std::errc::resource_unavailable_try_again));
+            }
+
+            return Result<int, std::error_code>::failure(
+                std::error_code(errno, std::generic_category()));
+        }
+
+        return Result<int, std::error_code>::success(connFd);
+    }
+
     int fd() const noexcept {
         return listen_fd;
     }

@@ -16,18 +16,28 @@ public:
     struct AcceptAwaiter {
         TcpSocket& socket;
         EventLoop& mainLoop;
+        std::error_code pendingError{};
 
         bool await_ready() const noexcept{
             return false;
         }
 
-        // 哪个协程暂停了，之后恢复哪个协程
-        void await_suspend(std::coroutine_handle<> handle) noexcept {
-            mainLoop.waitReadable(socket.fd(), handle);
+        // true 表示挂起， false 表示不要挂起
+        bool await_suspend(std::coroutine_handle<> handle) noexcept {
+            auto result = mainLoop.addReadEvent(socket.fd(), handle);
+            if (!result) {
+                pendingError = result.error();
+                return false;
+            }
+            return true;
         }
 
         Result<int, std::error_code> await_resume() noexcept {
+            if (pendingError)
+                return Result<int, std::error_code>::failure(pendingError);
+
             return socket.accept();
+
         }
 
     };
@@ -42,7 +52,7 @@ public:
     TcpAcceptor& operator=(TcpAcceptor&&) noexcept = default;
 
     // 工厂函数
-    static Result<TcpAcceptor, std::error_code> create(EventLoop& mainLoop) {
+    static Result<TcpAcceptor, std::error_code> create() {
         auto socketResult = TcpSocket::createTcpV4();
         if (!socketResult) {
             return Result<TcpAcceptor, std::error_code>::failure(
