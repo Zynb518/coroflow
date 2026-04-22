@@ -594,3 +594,20 @@ extern int accept4 (int __fd, __SOCKADDR_ARG __addr,
 ```
 
 在非阻塞 socket 上调用 accept 时，如果当前没有可立即取出的新连接，系统不会像阻塞模式那样卡住等待，而是直接返回 -1，并把 errno 设成 EAGAIN 或 EWOULDBLOCK；这在语义上并不表示“真正出错了”，而是表示“现在暂时没有资源可取，稍后再试”
+
+
+
+```cpp
+/* Set socket FD's option OPTNAME at protocol level LEVEL
+   to *OPTVAL (which is OPTLEN bytes long).
+   Returns 0 on success, -1 for errors.  */
+#ifndef __USE_TIME_BITS64
+extern int setsockopt (int __fd, int __level, int __optname,
+		       const void *__optval, socklen_t __optlen) __THROW;
+```
+
+```cpp
+::setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval))
+```
+
+放到你这句里逐个看：listen_fd 是要设置选项的那个 socket 文件描述符；SOL_SOCKET 表示“这个选项属于 socket 通用层”，不是 TCP 专属层、也不是IP 专属层；SO_REUSEADDR 是具体要设置的选项名，表示允许重用本地地址，开发时对服务器重启特别常见；&optval 是选项值的地址，你这里通常传一个 int optval = 1 表示打开，传 0 表示关闭；sizeof(optval) 就是这个值占多少字节，让内核知道该从用户态拷贝多大一块数据。换句话说，这句代码的自然语言就是：“对listen_fd 这个 socket，在 socket 通用层上，把 SO_REUSEADDR 这个选项设置成开启”。

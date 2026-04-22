@@ -24,11 +24,13 @@ public:
 
         // true 表示挂起， false 表示不要挂起
         bool await_suspend(std::coroutine_handle<> handle) noexcept {
+            std::cout << "co_await 之后，注册协程句柄 \n";
             auto result = mainLoop.addReadEvent(socket.fd(), handle);
             if (!result) {
                 pendingError = result.error();
                 return false;
             }
+            std::cout << "return true 挂起 \n";
             return true;
         }
 
@@ -66,6 +68,12 @@ public:
 
     Result<void, std::error_code> listen(const SocketAddress &address,
                                          int backlog = SOMAXCONN) {
+        auto reuseResult = socket.setReuseAddr(true);
+        if (!reuseResult) {
+            return Result<void, std::error_code>::failure(
+                std::move(reuseResult).error());
+        }
+
         auto bindResult = socket.bind(address);
         if (!bindResult) {
             return Result<void, std::error_code>::failure(

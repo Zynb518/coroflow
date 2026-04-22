@@ -8,11 +8,12 @@
 
 coroflow::Task<void> acceptLoop(coroflow::TcpAcceptor &acceptor,
                                 coroflow::EventLoop &loop) {
+    std::cout << "恢复协程 \n";
     for (;;) {
         auto acceptResult = co_await acceptor.accept(loop);
         if (!acceptResult)
             continue;
-
+        std::cout << "协程拿到 connFd \n";
         int connFd = acceptResult.value();
         ::close(connFd);
     }
@@ -34,7 +35,7 @@ int main() {
         return 1;
     }
 
-    auto addressResult = coroflow::SocketAddress::ipV4("0.0.0.0", 8080);
+    auto addressResult = coroflow::SocketAddress::ipV4("0.0.0.0", 10086);
     if (!addressResult) {
         std::cerr << "create address failed: "
                   << addressResult.error().message() << '\n';

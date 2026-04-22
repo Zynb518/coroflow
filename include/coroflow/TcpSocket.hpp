@@ -45,6 +45,22 @@ public:
         return Result<TcpSocket, std::error_code>::success(TcpSocket(fd));
     }
 
+    // 设置端口复用
+    Result<void, std::error_code> setReuseAddr(bool enable = true) noexcept {
+        if (listen_fd == -1) {
+            return Result<void, std::error_code>::failure(
+                std::make_error_code(std::errc::bad_file_descriptor));
+        }
+
+        int optval = enable ? 1 : 0;
+        if (::setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)) == -1) {
+            return Result<void, std::error_code>::failure(
+                std::error_code(errno, std::generic_category()));
+        }
+
+        return Result<void, std::error_code>::success();
+    }
+
     // 绑定
     Result<void, std::error_code> bind(const SocketAddress& address) noexcept {
         if (listen_fd == -1) {
