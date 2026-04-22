@@ -34,13 +34,26 @@ public:
                 epollerResult.error());
         }
 
-        return Result<EventLoop, std::error_code>::success(
-            EventLoop(std::move(epollerResult).value()));
+        auto notifierResult = EventNotifier::create();
+        if (!notifierResult) {
+            return Result<EventLoop, std::error_code>::failure(
+                notifierResult.error());
+        }
+
+        // 需要在内部注册好 notifier
+        EventLoop loop(std::move(epollerResult).value(),
+                       std::move(notifierResult).value());
+
+        auto addResult = loop.epoller.add(loop.eventNotifier.fd(), EPOLLIN | EPOLLET);
+        if (!addResult) {
+            return Result<EventLoop, std::error_code>::failure(
+                addResult.error());
+        }
+
+        return Result<EventLoop, std::error_code>::success(std::move(loop));
     }
 
-    ~EventLoop() {
-
-    }
+    ~EventLoop() = default;
 
     // 跑一次，就注销 handle， 但是 callback 不需要
     void run() {
@@ -70,8 +83,9 @@ public:
                         ctx.read.callback();
                     }
                 }
-            }
-        }
+            } // for
+
+        } // while
     }
 
     void stop() noexcept {
@@ -159,9 +173,9 @@ public:
 
 
 private:
-    explicit EventLoop(Epoller&& epoller)
-        :epoller(std::move(epoller)){
-
+    explicit EventLoop(Epoller &&epoller, EventNotifier &&notifier)
+        : epoller(std::move(epoller)),
+          eventNotifier(notifier) {
     }
 private:
     Epoller epoller;

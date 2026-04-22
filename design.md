@@ -534,3 +534,37 @@ extern int epoll_wait (int __epfd, struct epoll_event *__events,
 	__attr_access ((__write_only__, 2, 3)) __nonnull ((2));
 ```
 
+
+
+```cpp
+/* Return file descriptor for generic event channel.  Set initial
+   value to COUNT.  */
+extern int eventfd (unsigned int __count, int __flags) __THROW;
+```
+
+
+
+```cpp
+/* Write N bytes of BUF to FD.  Return the number written, or -1.
+
+   This function is a cancellation point and therefore not marked with
+   __THROW.  */
+extern ssize_t write (int __fd, const void *__buf, size_t __n) __wur
+    __attr_access ((__read_only__, 2, 3));
+```
+
+
+
+```cpp
+/* Read NBYTES into BUF from FD.  Return the
+   number read, -1 for errors or 0 for EOF.
+
+   This function is a cancellation point and therefore not marked with
+   __THROW.  */
+extern ssize_t read (int __fd, void *__buf, size_t __nbytes) __wur
+    __fortified_attr_access (__write_only__, 2, 3);
+```
+
+
+
+EINTR 表示这次read 被信号打断了，重试即可；EAGAIN 表示在非阻塞模式下当前已经没有可读计数了
