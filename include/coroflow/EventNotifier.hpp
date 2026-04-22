@@ -14,8 +14,19 @@ public:
     EventNotifier(const EventNotifier&) = delete;
     EventNotifier& operator=(const EventNotifier&) = delete;
 
-    EventNotifier(EventNotifier&&) noexcept = default;
-    EventNotifier& operator=(EventNotifier&&) noexcept = default;
+    EventNotifier(EventNotifier&& other) noexcept
+    :eventFd(std::exchange(other.eventFd, -1)){ }
+
+    EventNotifier& operator=(EventNotifier&& other) noexcept {
+        if (this == &other)
+            return *this;
+
+        if (eventFd != -1)
+            ::close(eventFd);
+
+        eventFd = std::exchange(other.eventFd, -1);
+        return *this;
+    }
 
     static Result<EventNotifier, std::error_code> create() {
         int fd = ::eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
