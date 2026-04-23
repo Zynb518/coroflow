@@ -84,6 +84,7 @@ public:
     AcceptAwaiter accept(EventLoop& mainLoop) noexcept {
         return AcceptAwaiter{socket, mainLoop};
     }
+
 private:
     explicit TcpAcceptor(TcpSocket && socket)
         :socket(std::move(socket)) {}

@@ -82,6 +82,7 @@ public:
         return Result<void, std::error_code>::success();
     }
 
+    // 等待事件
     Result<int, std::error_code> wait(epoll_event *epEvents,
                                       int maxEvents,
                                       int timeoutMs = -1) noexcept {
@@ -107,7 +108,6 @@ public:
                 std::error_code(errno, std::generic_category()));
         }
     }
-
 
 private:
     explicit Epoller(int epfd)

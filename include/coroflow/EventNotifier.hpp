@@ -93,8 +93,8 @@ public:
                 std::error_code(errno, std::generic_category())
             );
         }
-
     }
+
 private:
     explicit EventNotifier(int eventFd) noexcept
         : eventFd(eventFd) { }

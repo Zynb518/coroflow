@@ -1,59 +1,15 @@
 #include <iostream>
 
-#include <coroflow/Task.hpp>
-#include <coroflow/TcpAcceptor.hpp>
-#include <coroflow/EventLoop.hpp>
-
-#include <unistd.h>
-
-coroflow::Task<void> acceptLoop(coroflow::TcpAcceptor &acceptor,
-                                coroflow::EventLoop &loop) {
-    std::cout << "恢复协程 \n";
-    for (;;) {
-        auto acceptResult = co_await acceptor.accept(loop);
-        if (!acceptResult)
-            continue;
-        std::cout << "协程拿到 connFd \n";
-        int connFd = acceptResult.value();
-        ::close(connFd);
-    }
-}
+#include <coroflow/TcpServer.hpp>
 
 int main() {
-    auto loopResult = coroflow::EventLoop::create();
+    try {
 
-    if (!loopResult) {
-        std::cerr << "create event loop failed: "
-                  << loopResult.error().message() << '\n';
-        return 1;
+    }catch (std::exception &e) {
+        std::cout << "发生异常 :" << e.what() << "\n";
     }
-
-    auto acceptorResult = coroflow::TcpAcceptor::create();
-    if (!acceptorResult) {
-        std::cerr << "create acceptor failed: "
-                  << acceptorResult.error().message() << '\n';
-        return 1;
+    catch (...) {
+        std::cout << "发生未知异常 \n";
     }
-
-    auto addressResult = coroflow::SocketAddress::ipV4("0.0.0.0", 10086);
-    if (!addressResult) {
-        std::cerr << "create address failed: "
-                  << addressResult.error().message() << '\n';
-        return 1;
-    }
-
-    auto listenResult = acceptorResult.value().listen(addressResult.value());
-    if (!listenResult) {
-        std::cerr << "listen failed: "
-                  << listenResult.error().message() << '\n';
-        return 1;
-    }
-
-    auto task = acceptLoop(acceptorResult.value(), loopResult.value());
-    task.resume();
-
-    loopResult.value().run();
-    return 0;
-
 
 }

@@ -36,6 +36,13 @@ public:
             return Result<TcpServer, std::error_code>::failure(
                 loopResult.error());
         }
+
+        auto poolResult = EventLoopThreadPool::create(threadNums);
+        if (!poolResult) {
+            return Result<TcpServer, std::error_code>::failure(
+                poolResult.error());
+        }
+
         auto listenResult = accpetorResult.value().listen(listenAddress);
         if (!listenResult) {
             return Result<TcpServer, std::error_code>::failure(
@@ -43,7 +50,10 @@ public:
         }
 
         return Result<TcpServer, std::error_code>::success(
-            TcpServer(std::move(accpetorResult).value(), std::move(loopResult).value(), threadNums ));
+            TcpServer(std::move(accpetorResult).value(),
+                std::move(loopResult).value(),
+                threadNums,
+                std::move(poolResult).value() ));
     }
 
     ~TcpServer() {
@@ -68,25 +78,29 @@ public:
             int connFd = acceptResult.value();
             auto dispatchResult = dispatchConnFd(connFd);
             if (!dispatchResult) {
-                LOG_ERROR << "分发连接文件描述符失败";
+                LOG_ERROR << "分发连接文件描述符失败" << dispatchResult.error();
                 ::close(connFd);
                 continue;
             }
+
         }
     }
 
-
-
     Result<void, std::error_code> run() {
+        if (running) {
+            return Result<void, std::error_code>::failure(
+                std::make_error_code(std::errc::operation_in_progress));
+        }
+
         auto poolRunResult = workerThreadPool.run();
         if (!poolRunResult) {
             return Result<void, std::error_code>::failure(
                 poolRunResult.error());
         }
-
         acceptTask = acceptLoop();
-        acceptTask.resume(); // 推进到第一次 co_await accept
+        acceptTask.resume(); // 推进到第一次 co_await accept, 每次循环都添加进mainLoop
 
+        running = true;
         mainLoop.run(); // 主线程开始跑 accept loop
 
         return Result<void, std::error_code>::success();
@@ -108,9 +122,14 @@ private:
     }
 
 private:
-    explicit TcpServer(TcpAcceptor&& acceptor, EventLoop&& mainLoop, size_t threadNums)
-        :acceptor(std::move(acceptor)), mainLoop(std::move(mainLoop)), selector(threadNums) {
-
+    explicit TcpServer(TcpAcceptor &&acceptor,
+                       EventLoop &&mainLoop,
+                       size_t threadNums,
+                       EventLoopThreadPool &&pool)
+        : acceptor(std::move(acceptor)),
+          mainLoop(std::move(mainLoop)),
+          selector(threadNums),
+          workerThreadPool(std::move(pool)) {
     }
 private:
     TcpAcceptor acceptor;
@@ -120,5 +139,7 @@ private:
 
     ConnectionHandler connectionHandler;
     Task<void> acceptTask; // TcpServer 的长期后台任务，与TcpServer同生死
+
+    bool running{false};
 };
 }
