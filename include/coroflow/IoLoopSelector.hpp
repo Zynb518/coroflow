@@ -7,14 +7,14 @@ namespace coroflow {
 class IoLoopSelector {
 public:
     explicit IoLoopSelector(size_t loopNums)
-        :loopNums(loopNums){}
+        :loopNums_(loopNums){}
     ~IoLoopSelector() =default;
 
     size_t next() {
-        return (++curIndex) % loopNums;
+        return (++curIndex_) % loopNums_;
     }
 private:
-    size_t curIndex {0};
-    size_t loopNums;
+    size_t curIndex_ {0};
+    size_t loopNums_;
 };
 }

@@ -15,16 +15,16 @@ public:
     Epoller& operator=(const Epoller&) = delete;
 
     Epoller(Epoller && other) noexcept {
-        epfd = std::exchange(other.epfd, -1);
+        epfd_ = std::exchange(other.epfd_, -1);
     }
 
     Epoller& operator=(Epoller && other) noexcept {
         if (this == &other)
             return *this;
 
-        if (epfd != -1)
-            ::close(epfd);
-        epfd = std::exchange(other.epfd, -1);
+        if (epfd_ != -1)
+            ::close(epfd_);
+        epfd_ = std::exchange(other.epfd_, -1);
         return *this;
     }
 
@@ -42,8 +42,8 @@ public:
     }
 
     ~Epoller() {
-        if (epfd != -1)
-            ::close(epfd);
+        if (epfd_ != -1)
+            ::close(epfd_);
     }
 
     // 增
@@ -51,7 +51,7 @@ public:
         epoll_event ev{};
         ev.events = events;
         ev.data.fd = fd;
-        int ret = ::epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &ev);if (ret == -1) {
+        int ret = ::epoll_ctl(epfd_, EPOLL_CTL_ADD, fd, &ev);if (ret == -1) {
             return Result<void, std::error_code>::failure(
                 std::error_code(errno, std::generic_category()));
         }
@@ -63,7 +63,7 @@ public:
         epoll_event ev{};
         ev.events = events;
         ev.data.fd = fd;
-        int ret = ::epoll_ctl(epfd, EPOLL_CTL_MOD, fd, &ev);
+        int ret = ::epoll_ctl(epfd_, EPOLL_CTL_MOD, fd, &ev);
         if (ret == -1) {
             return Result<void, std::error_code>::failure(
                 std::error_code(errno, std::generic_category()));
@@ -72,7 +72,7 @@ public:
     }
     // 删
     Result<void, std::error_code> del(int fd) {
-        int ret = ::epoll_ctl(epfd, EPOLL_CTL_DEL, fd, nullptr);
+        int ret = ::epoll_ctl(epfd_, EPOLL_CTL_DEL, fd, nullptr);
         if (ret == -1) {
             return Result<void, std::error_code>::failure(
                 std::error_code(errno, std::generic_category())
@@ -86,7 +86,7 @@ public:
     Result<int, std::error_code> wait(epoll_event *epEvents,
                                       int maxEvents,
                                       int timeoutMs = -1) noexcept {
-        if (epfd == -1) {
+        if (epfd_ == -1) {
             return Result<int, std::error_code>::failure(
                 std::make_error_code(std::errc::bad_file_descriptor));
         }
@@ -97,7 +97,7 @@ public:
         }
 
         for (;;) {
-            int readyCount = ::epoll_wait(epfd, epEvents, maxEvents, timeoutMs);
+            int readyCount = ::epoll_wait(epfd_, epEvents, maxEvents, timeoutMs);
             if (readyCount >= 0) {
                 return Result<int, std::error_code>::success(readyCount);
             }
@@ -111,9 +111,9 @@ public:
 
 private:
     explicit Epoller(int epfd)
-        : epfd(epfd) {}
+        : epfd_(epfd) {}
 private:
-    int epfd {-1};
+    int epfd_ {-1};
 };
 
 }

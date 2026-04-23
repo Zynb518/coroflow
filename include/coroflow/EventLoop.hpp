@@ -26,12 +26,12 @@ public:
     EventLoop& operator=(const EventLoop&) = delete;
 
     EventLoop(EventLoop &&other) noexcept
-        : epoller(std::move(other.epoller)),
-          eventNotifier(std::move(other.eventNotifier)),
-          timerQueue(std::move(other.timerQueue)),
-          fdContexts(std::move(other.fdContexts)),
-          connections(std::move(other.connections)),
-          running(other.running) {
+        : epoller_(std::move(other.epoller_)),
+          notifier_(std::move(other.notifier_)),
+          timerQueue_(std::move(other.timerQueue_)),
+          fdContexts_(std::move(other.fdContexts_)),
+          connections_(std::move(other.connections_)),
+          running_(other.running_) {
     }
 
     EventLoop &operator=(EventLoop &&other) noexcept {
@@ -39,12 +39,12 @@ public:
             return *this;
         }
 
-        epoller = std::move(other.epoller);
-        eventNotifier = std::move(other.eventNotifier);
-        timerQueue = std::move(other.timerQueue);
-        fdContexts = std::move(other.fdContexts);
-        connections = std::move(other.connections);
-        running = other.running;
+        epoller_ = std::move(other.epoller_);
+        notifier_ = std::move(other.notifier_);
+        timerQueue_ = std::move(other.timerQueue_);
+        fdContexts_ = std::move(other.fdContexts_);
+        connections_ = std::move(other.connections_);
+        running_ = other.running_;
 
         return *this;
     }
@@ -68,7 +68,7 @@ public:
         EventLoop loop(std::move(epollerResult).value(),
                        std::move(notifierResult).value());
 
-        auto addResult = loop.epoller.add(loop.eventNotifier.fd(), EPOLLIN | EPOLLET);
+        auto addResult = loop.epoller_.add(loop.notifier_.fd(), EPOLLIN | EPOLLET);
         if (!addResult) {
             return Result<EventLoop, std::error_code>::failure(
                 addResult.error());
@@ -82,125 +82,134 @@ public:
     // 跑一次，就注销 handle， 但是 callback 不需要
     void run() {
         std::array<epoll_event, 64> epEvents{};
-        running = true;
+        running_ = true;
 
-        while (running) {
-            auto waitResult = epoller.wait(epEvents.data(),
+        while (running_) {
+            auto waitResult = epoller_.wait(epEvents.data(),
                                            epEvents.size(), -1); // 阻塞 wait
             if (!waitResult)
                 continue;
             int readyCount = waitResult.value();
+            // 有事件
             for (int i = 0; i < readyCount; ++i) {
                 int fd = epEvents[i].data.fd;
                 // 被唤醒，单独处理
-                if (fd == eventNotifier.fd()) {
-                    eventNotifier.handleRead();
+                if (fd == notifier_.fd()) {
+                    notifier_.handleRead();
                     continue;
                 }
 
                 uint32_t revents = epEvents[i].events;
 
-                auto it = fdContexts.find(fd);
-                if (it == fdContexts.end())
+                auto it = fdContexts_.find(fd);
+                if (it == fdContexts_.end())
                     continue;
 
                 auto& ctx = it->second;
                 if (revents & EPOLLIN) {
-                    if (ctx.read.handle) {
-                        auto handle = std::exchange(ctx.read.handle, std::coroutine_handle<>{});
+                    if (ctx.read_.handle_) {
+                        auto handle = std::exchange(ctx.read_.handle_, std::coroutine_handle<>{});
                         handle.resume();
-                    } else if (ctx.read.callback) {
-                        ctx.read.callback();
+                    } else if (ctx.read_.callback_) {
+                        ctx.read_.callback_();
                     }
                 }
             } // for
+
+            // 处理 fd 添加连接
+            {
+                std::lock_guard lock(pendingConnFdsMutex_);
+                for (int fd : penddingConnFds_) {
+
+                }
+            }
 
         } // while
     }
 
     void stop() noexcept {
-        running = false;
-        eventNotifier.notify();
+        running_ = false;
+        notifier_.notify();
     }
 
     // “epoll 永久订阅、协程一次性消费”
     Result<void, std::error_code> addReadEvent(int fd,
                                                std::coroutine_handle<> handle) {
-        auto& ctx = fdContexts[fd];
-        ctx.fd = fd;
+        auto& ctx = fdContexts_[fd];
+        ctx.fd_ = fd;
 
         // 已经有句柄或者回调 不能重复注册
-        if (ctx.read.handle || ctx.read.callback) {
+        if (ctx.read_.handle_ || ctx.read_.callback_) {
             return Result<void, std::error_code>::failure(
                 std::make_error_code(std::errc::operation_in_progress));
         }
-        ctx.read.handle = handle;
+        ctx.read_.handle_ = handle;
 
-        uint32_t newEvents = ctx.interestedEvents | EPOLLIN | EPOLLET; // 新的感兴趣的事件
+        uint32_t newEvents = ctx.interestedEvents_ | EPOLLIN | EPOLLET; // 新的感兴趣的事件
         auto result = Result<void, std::error_code>::success();
         // 有interestedEvents = 已经注册epoll
-        if ((ctx.interestedEvents & EPOLLIN) == 0) {
+        if ((ctx.interestedEvents_ & EPOLLIN) == 0) {
             result = ctx.isRegistered()
-                ? epoller.mod(fd, newEvents)
-                : epoller.add(fd, newEvents);
+                ? epoller_.mod(fd, newEvents)
+                : epoller_.add(fd, newEvents);
         }
 
         if (!result) {
-            ctx.read.handle = {}; // 修改失败，清空句柄
+            ctx.read_.handle_ = {}; // 修改失败，清空句柄
             return Result<void, std::error_code>::failure(
                 result.error());
         }
 
-        ctx.interestedEvents = newEvents; // epoll先添加成功 才能标记注册
+        ctx.interestedEvents_ = newEvents; // epoll先添加成功 才能标记注册
         return Result<void, std::error_code>::success();
     }
 
     // 读回调重载
     Result<void, std::error_code> addReadEvent(int fd,
                                                std::function<void()> callback) {
-        auto& ctx = fdContexts[fd];
-        ctx.fd = fd;
+        auto& ctx = fdContexts_[fd];
+        ctx.fd_ = fd;
 
-        if (ctx.read.handle || ctx.read.callback) {
+        if (ctx.read_.handle_ || ctx.read_.callback_) {
             return Result<void, std::error_code>::failure(
                 std::make_error_code(std::errc::operation_in_progress));
         }
-        ctx.read.callback = std::move(callback);
+        ctx.read_.callback_ = std::move(callback);
 
-        uint32_t newEvents = ctx.interestedEvents | EPOLLIN | EPOLLET;
+        uint32_t newEvents = ctx.interestedEvents_ | EPOLLIN | EPOLLET;
         Result<void, std::error_code> result = Result<void, std::error_code>::success();
-        if ((ctx.interestedEvents & EPOLLIN) == 0) {
+        if ((ctx.interestedEvents_ & EPOLLIN) == 0) {
             result = ctx.isRegistered()
-                ? epoller.mod(fd, newEvents)
-                : epoller.add(fd, newEvents);
+                ? epoller_.mod(fd, newEvents)
+                : epoller_.add(fd, newEvents);
         }
 
         if (!result) {
-            ctx.read.callback = nullptr;
+            ctx.read_.callback_ = nullptr;
             return Result<void, std::error_code>::failure(
                 result.error());
         }
 
-        ctx.interestedEvents = newEvents;
+        ctx.interestedEvents_ = newEvents;
         return Result<void, std::error_code>::success();
     }
 
     // 某个 fd 已经注册在 epoll + fdContexts 里，但还没来得及放进 connections
     Result<void, std::error_code> remove(int fd) {
-        auto fdIt = fdContexts.find(fd);
-        if (fdIt == fdContexts.end())
+        auto fdIt = fdContexts_.find(fd);
+        if (fdIt == fdContexts_.end())
             return Result<void, std::error_code>::success();
 
-        auto delResult = epoller.del(fd);
+        auto delResult = epoller_.del(fd);
         if (!delResult) {
             return Result<void, std::error_code>::failure(
                 delResult.error());
         }
-        fdContexts.erase(fdIt);
+        fdContexts_.erase(fdIt);
 
-        auto conIt = connections.find(fd);
-        if (conIt != connections.end())
-            connections.erase(conIt);
+        auto conIt = connections_.find(fd);
+        if (conIt != connections_.end())
+            connections_.erase(conIt);
 
         return Result<void, std::error_code>::success();
     }
@@ -208,28 +217,28 @@ public:
     // 跨线程投递能力
     void pushConnfd(int connFd) {
         {
-            std::lock_guard lock(pendingConnFdsMutex);
-            penddingConnFds.push_back(connFd);
+            std::lock_guard lock(pendingConnFdsMutex_);
+            penddingConnFds_.push_back(connFd);
         }
-        eventNotifier.notify();
+        notifier_.notify();
     }
 
 private:
     explicit EventLoop(Epoller &&epoller, EventNotifier &&notifier)
-        : epoller(std::move(epoller)),
-          eventNotifier(std::move(notifier)) {
+        : epoller_(std::move(epoller)),
+          notifier_(std::move(notifier)) {
     }
 private:
-    Epoller epoller;
-    EventNotifier eventNotifier;
-    TimerQueue timerQueue;
-    std::unordered_map<int, FdContext> fdContexts {};
-    std::unordered_map<int, std::shared_ptr<TcpConnection>> connections {};
+    Epoller epoller_;
+    EventNotifier notifier_;
+    TimerQueue timerQueue_;
+    std::unordered_map<int, FdContext> fdContexts_ {};
+    std::unordered_map<int, std::shared_ptr<TcpConnection>> connections_ {};
 
-    std::mutex pendingConnFdsMutex;
-    std::deque<int> penddingConnFds;
+    std::mutex pendingConnFdsMutex_;
+    std::deque<int> penddingConnFds_;
 
-    bool running{false};
+    bool running_{false};
 };
 
 }

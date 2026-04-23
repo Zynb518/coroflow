@@ -25,14 +25,14 @@ public:
 
         // 先创建 EventLoop
         EventLoopThreadPool pool;
-        pool.loops.reserve(threadNums);
+        pool.loops_.reserve(threadNums);
         for (size_t i = 0; i < threadNums; ++i) {
             auto loopResult = EventLoop::create();
             if (!loopResult) {
                 return Result<EventLoopThreadPool, std::error_code>::failure(
                     loopResult.error());
             }
-            pool.loops.push_back(std::move(loopResult).value());
+            pool.loops_.push_back(std::move(loopResult).value());
         }
         return Result<EventLoopThreadPool, std::error_code>::success(
             std::move(pool));
@@ -44,72 +44,72 @@ public:
 
     // 启动的时候，再添加 thread 开始运行
     Result<void, std::error_code> run() {
-        if (running) { // 已经启动
+        if (running_) { // 已经启动
             return Result<void, std::error_code>::failure(
                 std::make_error_code(std::errc::operation_in_progress));
         }
 
         try {
-            for (size_t i = 0; i < loops.size(); ++i) {
-                EventLoop* loop = &loops[i];
-                threads.emplace_back([loop]() {
+            for (size_t i = 0; i < loops_.size(); ++i) {
+                EventLoop* loop = &loops_[i];
+                threads_.emplace_back([loop]() {
                     loop->run();
                 });
             }
         } catch (const std::system_error& e) {
-            for (auto& loop : loops)
+            for (auto& loop : loops_)
                 loop.stop();
 
-            for (auto& thread : threads)
+            for (auto& thread : threads_)
                 if (thread.joinable())
                     thread.join();
 
 
-            threads.clear();
+            threads_.clear();
             return Result<void, std::error_code>::failure(e.code());
         }
 
-        running = true;
+        running_ = true;
         return Result<void, std::error_code>::success();
     }
 
     // 停止逻辑，让loop先停下来，才能join
     void stop() {
-        if (!running)
+        if (!running_)
             return;
 
-        for (auto& loop : loops)
+        for (auto& loop : loops_)
             loop.stop();
 
-        for (auto& thread : threads)
+        for (auto& thread : threads_)
             if (thread.joinable())
                 thread.join();
 
-        threads.clear();
-        running = false;
+        threads_.clear();
+        running_ = false;
     }
 
     // 跨线程投递接口
     Result<void, std::error_code> pushConnfd(size_t index, int connFd) {
-        if (index >= loops.size()) {
+        if (index >= loops_.size()) {
             return Result<void, std::error_code>::failure(
                 std::make_error_code(std::errc::invalid_argument));
         }
-        loops[index].pushConnfd(connFd);
+        loops_[index].pushConnfd(connFd);
         return Result<void, std::error_code>::success();
     }
 
     size_t size() const noexcept {
-        return loops.size();
+        return loops_.size();
     }
 
 private:
     EventLoopThreadPool() = default;
 
 private:
-    std::vector<EventLoop> loops;
-    std::vector<std::thread> threads;
-    bool running{false};
+    std::vector<EventLoop> loops_;
+    std::vector<std::thread> threads_;
+    bool running_{false};
 };
 
 }

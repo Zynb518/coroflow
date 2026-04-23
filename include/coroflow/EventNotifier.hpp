@@ -15,16 +15,16 @@ public:
     EventNotifier& operator=(const EventNotifier&) = delete;
 
     EventNotifier(EventNotifier&& other) noexcept
-    :eventFd(std::exchange(other.eventFd, -1)){ }
+    :eventFd_(std::exchange(other.eventFd_, -1)){ }
 
     EventNotifier& operator=(EventNotifier&& other) noexcept {
         if (this == &other)
             return *this;
 
-        if (eventFd != -1)
-            ::close(eventFd);
+        if (eventFd_ != -1)
+            ::close(eventFd_);
 
-        eventFd = std::exchange(other.eventFd, -1);
+        eventFd_ = std::exchange(other.eventFd_, -1);
         return *this;
     }
 
@@ -39,23 +39,23 @@ public:
     }
 
     ~EventNotifier() {
-        if (eventFd != -1)
-            ::close(eventFd);
+        if (eventFd_ != -1)
+            ::close(eventFd_);
     }
 
     int fd() const noexcept {
-        return eventFd;
+        return eventFd_;
     }
 
     // 除发可读
     Result<void, std::error_code> notify() noexcept {
-        if (eventFd == -1) {
+        if (eventFd_ == -1) {
             return Result<void, std::error_code>::failure(
                 std::make_error_code(std::errc::bad_file_descriptor));
         }
 
         uint64_t one = 1;
-        ssize_t n = ::write(eventFd, &one, sizeof(one)); // 往 eventfd 写入一个 uint64_t
+        ssize_t n = ::write(eventFd_, &one, sizeof(one)); // 往 eventfd 写入一个 uint64_t
         if (n == -1 ) {
             if (errno == EAGAIN)  // 已经有未消费的唤醒信号，当前这次额外 notify 可以视为成功
                 return Result<void, std::error_code>::success();
@@ -71,7 +71,7 @@ public:
 
     // 把可读处理掉
     Result<void, std::error_code> handleRead() noexcept {
-        if (eventFd == -1) {
+        if (eventFd_ == -1) {
             return Result<void, std::error_code>::failure(
                 std::make_error_code(std::errc::bad_file_descriptor));
         }
@@ -79,7 +79,7 @@ public:
         uint64_t value = 0;
 
         for (;;) {
-            ssize_t n = ::read(eventFd, &value, sizeof(value));
+            ssize_t n = ::read(eventFd_, &value, sizeof(value));
             if (n == sizeof(value))
                 return Result<void, std::error_code>::success();
 
@@ -97,10 +97,10 @@ public:
 
 private:
     explicit EventNotifier(int eventFd) noexcept
-        : eventFd(eventFd) { }
+        : eventFd_(eventFd) { }
 
 private:
-    int eventFd{-1};
+    int eventFd_{-1};
 };
 
 }

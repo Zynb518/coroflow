@@ -102,11 +102,16 @@ public:
 
         running = true;
         mainLoop.run(); // 主线程开始跑 accept loop
+        acceptTask = Task<void>{}; // 这里再销毁协程帧才安全
+        running = false;
 
         return Result<void, std::error_code>::success();
     }
 
     void stop() {
+        if (!running)
+            return;
+
         mainLoop.stop();
         workerThreadPool.stop();
     }

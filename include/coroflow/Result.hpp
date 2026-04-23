@@ -27,7 +27,7 @@ public:
     }
 
     bool hasValue () const {
-        return std::holds_alternative<T>(storage);
+        return std::holds_alternative<T>(storage_);
     }
 
     explicit operator bool() const {
@@ -39,21 +39,21 @@ public:
         if (!hasValue()) {
             throw std::logic_error("Result does not contain a value");
         }
-        return std::get<T>(storage);
+        return std::get<T>(storage_);
     }
 
     const T& value() const& {
         if (!hasValue()) {
             throw std::logic_error("Result does not contain a value");
         }
-        return std::get<T>(storage);
+        return std::get<T>(storage_);
     }
 
     T&& value() && {
         if (!hasValue()) {
             throw std::logic_error("Result does not contain a value");
         }
-        return std::get<T>(std::move(storage));
+        return std::get<T>(std::move(storage_));
     }
 
     // 同 value
@@ -61,21 +61,21 @@ public:
         if (hasValue()) {
             throw std::logic_error("Result does not contain an error");
         }
-        return std::get<E>(storage);
+        return std::get<E>(storage_);
     }
 
     const E& error() const& {
         if (hasValue()) {
             throw std::logic_error("Result does not contain an error");
         }
-        return std::get<E>(storage);
+        return std::get<E>(storage_);
     }
 
     E&& error() && {
         if (hasValue()) {
             throw std::logic_error("Result does not contain an error");
         }
-        return std::get<E>(std::move(storage));
+        return std::get<E>(std::move(storage_));
     }
 
 private:
@@ -84,14 +84,14 @@ private:
 
     template<typename U>
     explicit Result(SuccessTag, U&& value)
-        :storage(std::forward<U>(value)) {}
+        :storage_(std::forward<U>(value)) {}
 
     template<typename F>
     explicit Result(ErrorTag, F&& error)
-        :storage(std::forward<F>(error)) {}
+        :storage_(std::forward<F>(error)) {}
 
 private:
-    std::variant<T, E> storage;
+    std::variant<T, E> storage_;
 };
 
 // 对主模板的特化
@@ -108,7 +108,7 @@ public:
     }
 
     bool hasValue() const {
-        return ok;
+        return ok_;
     }
 
     explicit operator bool() const {
@@ -117,41 +117,41 @@ public:
 
     // value 只有一种 因为没有 void& 这些
     void value() const {
-        if (!ok) {
+        if (!ok_) {
             throw std::logic_error("Result does not contain a value");
         }
     }
 
     // error 依旧两种
     E& error() & {
-        if (ok) {
+        if (ok_) {
             throw std::logic_error("Result does not contain an error");
         }
-        return errorValue;
+        return error_;
     }
 
     const E& error() const& {
-        if (ok) {
+        if (ok_) {
             throw std::logic_error("Result does not contain an error");
         }
-        return errorValue;
+        return error_;
     }
 
     E&& error() && {
-        if (ok) {
+        if (ok_) {
             throw std::logic_error("Result does not contain an error");
         }
-        return std::move(errorValue);
+        return std::move(error_);
     }
 
 private:
     template<typename F>
     Result(bool ok, F&& error)
-        : ok(ok), errorValue(std::forward<F>(error)) {}
+        : ok_(ok), error_(std::forward<F>(error)) {}
 
 private:
-    bool ok;
-    E errorValue;
+    bool ok_;
+    E error_;
 };
 
 

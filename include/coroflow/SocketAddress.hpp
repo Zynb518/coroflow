@@ -36,26 +36,26 @@ public:
     }
 
     const sockaddr* sockaddrPtr() const noexcept {
-        return reinterpret_cast<const sockaddr*>(&address);
+        return reinterpret_cast<const sockaddr*>(&address_);
     }
 
     socklen_t sockaddrLen() const noexcept {
-        return sizeof(address);
+        return sizeof(address_);
     }
 
     std::string toString() const {
         char buf[INET_ADDRSTRLEN];
-        ::inet_ntop(AF_INET, &address.sin_addr, buf, INET_ADDRSTRLEN);
-        return std::string(buf) + ":" + std::to_string(::ntohs(address.sin_port));
+        ::inet_ntop(AF_INET, &address_.sin_addr, buf, INET_ADDRSTRLEN);
+        return std::string(buf) + ":" + std::to_string(::ntohs(address_.sin_port));
     }
 
 private:
     explicit SocketAddress(const sockaddr_in& address)
-        : address(address){}
+        : address_(address){}
 
 
 private:
-    sockaddr_in address{};
+    sockaddr_in address_{};
 };
 
 }

@@ -17,42 +17,42 @@ public:
     Task() = default;
 
     explicit Task(handle_type handle) noexcept
-        :handle(handle) {}
+        :handle_(handle) {}
 
     Task(const Task&) = delete;
     Task& operator=(const Task&) = delete;
 
     Task(Task&& other) noexcept
-        :handle(std::exchange(other.handle, {})) {}
+        :handle_(std::exchange(other.handle, {})) {}
 
     Task& operator=(Task&& other) noexcept {
         if (this == &other)
             return *this;
 
-        if (handle)
-            handle.destroy();
+        if (handle_)
+            handle_.destroy();
 
-        handle = std::exchange(other.handle, {});
+        handle_ = std::exchange(other.handle, {});
         return *this;
     }
 
     ~Task() {
-        if (handle)
-            handle.destroy();
+        if (handle_)
+            handle_.destroy();
     }
 
     // 协程句柄是否有效
     bool valid() const noexcept {
-        return static_cast<bool>(handle);
+        return static_cast<bool>(handle_);
     }
     // 协程是否已完成
     bool done() const noexcept {
-        return (handle && handle.done());
+        return (handle_ && handle_.done());
     }
     // 恢复协程句柄
     void resume() noexcept {
-        if (handle && !handle.done()) {
-            handle.resume();
+        if (handle_ && !handle_.done()) {
+            handle_.resume();
         }
     }
 
@@ -106,16 +106,16 @@ public:
 
     /* ---- co_await 三件套 ---- */
     bool await_ready() const noexcept {
-        return !handle || handle.done();
+        return !handle_ || handle_.done();
     }
     // 保存父协程
     handle_type await_suspend(std::coroutine_handle<> continuation) noexcept {
-        handle.promise().continuation = continuation;
-        return handle;
+        handle_.promise().continuation = continuation;
+        return handle_;
     }
     // 有异常重新抛出，没异常保存返回值
     T await_resume() {
-        auto& promise = handle.promise();
+        auto& promise = handle_.promise();
 
         if (promise.exception)
             std::rethrow_exception(promise.exception);
@@ -125,7 +125,7 @@ public:
 
 
 private:
-    handle_type handle;
+    handle_type handle_;
 };
 
 template<>
@@ -137,42 +137,42 @@ public:
     Task() noexcept = default;
 
     explicit Task(handle_type handle) noexcept
-        : handle(handle) {}
+        : handle_(handle) {}
 
     Task(const Task&) = delete;
     Task& operator=(const Task&) = delete;
 
     Task(Task&& other) noexcept
-        : handle(std::exchange(other.handle, {})) {}
+        : handle_(std::exchange(other.handle_, {})) {}
 
     Task& operator=(Task&& other) noexcept {
         if (this == &other)
             return *this;
 
-        if (handle)
-            handle.destroy();
+        if (handle_)
+            handle_.destroy();
 
-        handle = std::exchange(other.handle, {});
+        handle_ = std::exchange(other.handle_, {});
         return *this;
     }
 
     ~Task() {
-        if (handle)
-            handle.destroy();
+        if (handle_)
+            handle_.destroy();
     }
 
     // 协程句柄是否有效
     bool valid() const noexcept {
-        return static_cast<bool>(handle);
+        return static_cast<bool>(handle_);
     }
     // 协程是否已完成
     bool done() const noexcept {
-        return (handle && handle.done());
+        return (handle_ && handle_.done());
     }
     // 恢复协程句柄
     void resume() noexcept {
-        if (handle && !handle.done()) {
-            handle.resume();
+        if (handle_ && !handle_.done()) {
+            handle_.resume();
         }
     }
 
@@ -218,22 +218,22 @@ public:
 
     /* ---- co_await 三件套 ---- */
     bool await_ready() const noexcept {
-        return !handle || handle.done();
+        return !handle_ || handle_.done();
     }
 
     handle_type await_suspend(std::coroutine_handle<> continuation) noexcept {
-        handle.promise().continuation = continuation;
-        return handle;
+        handle_.promise().continuation = continuation;
+        return handle_;
     }
 
     void await_resume() {
-        auto& promise = handle.promise();
+        auto& promise = handle_.promise();
         if (promise.exception)
             std::rethrow_exception(promise.exception);
     }
 
 private:
-    handle_type handle{};
+    handle_type handle_{};
 };
 
 

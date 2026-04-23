@@ -258,6 +258,18 @@ std::variant<T, E> storage_;
 - 成功时，`storage_` 里装一个 `T`
 - 失败时，`storage_` 里装一个 `E`
 
+
+
+## std::memmove()
+
+```cpp
+void* memmove(void* dest, const void* src, std::size_t count);
+```
+
+```cpp
+std::memmove(buffer.data(), buffer.data() + readPos, readableBytes);
+```
+
 然后：
 
 ```cpp
@@ -585,6 +597,28 @@ extern ssize_t write (int __fd, const void *__buf, size_t __n) __wur
    __THROW.  */
 extern ssize_t read (int __fd, void *__buf, size_t __nbytes) __wur
     __fortified_attr_access (__write_only__, 2, 3);
+```
+
+
+
+```cpp
+struct iovec {
+    void*  iov_base;
+    size_t iov_len;
+};
+
+extern ssize_t readv(int __fd, const struct iovec* __iovec, int __count);
+```
+readv 使用方法
+
+```cpp
+iovec vec[2];
+vec[0].iov_base = buffer.data() + writePos;
+vec[0].iov_len = writable();
+vec[1].iov_base = extrabuf;
+vec[1].iov_len = sizeof(extrabuf);
+
+ssize_t n = ::readv(fd, vec, 2);
 ```
 
 

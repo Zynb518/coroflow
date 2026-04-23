@@ -66,31 +66,31 @@ public:
 
     Result<void, std::error_code> listen(const SocketAddress &address,
                                          int backlog = SOMAXCONN) {
-        auto reuseResult = socket.setReuseAddr(true);
+        auto reuseResult = socket_.setReuseAddr(true);
         if (!reuseResult) {
             return Result<void, std::error_code>::failure(
                 std::move(reuseResult).error());
         }
 
-        auto bindResult = socket.bind(address);
+        auto bindResult = socket_.bind(address);
         if (!bindResult) {
             return Result<void, std::error_code>::failure(
                 std::move(bindResult).error());
         }
-        return socket.listen(backlog);
+        return socket_.listen(backlog);
     }
 
     // 协程风格 返回一个可等待的对象
     AcceptAwaiter accept(EventLoop& mainLoop) noexcept {
-        return AcceptAwaiter{socket, mainLoop};
+        return AcceptAwaiter{socket_, mainLoop};
     }
 
 private:
     explicit TcpAcceptor(TcpSocket && socket)
-        :socket(std::move(socket)) {}
+        :socket_(std::move(socket)) {}
 
 private:
-    TcpSocket socket;
+    TcpSocket socket_;
 };
 
 }
