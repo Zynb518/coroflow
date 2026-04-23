@@ -6,13 +6,13 @@
 #include <coroflow/TimerQueue.hpp>
 #include <coroflow/Result.hpp>
 
-#include <vector>
 #include <array>
 #include <coroutine>
 #include <functional>
 #include <system_error>
 #include <unordered_map>
 #include <utility>
+#include <memory>
 
 #include "FdContext.hpp"
 
@@ -161,20 +161,23 @@ public:
         return Result<void, std::error_code>::success();
     }
 
-
+    // 某个 fd 已经注册在 epoll + fdContexts 里，但还没来得及放进 connections
     Result<void, std::error_code> remove(int fd) {
-        auto it = fdContexts.find(fd);
-        if (it == fdContexts.end()) {
+        auto fdIt = fdContexts.find(fd);
+        if (fdIt == fdContexts.end())
             return Result<void, std::error_code>::success();
-        }
 
         auto delResult = epoller.del(fd);
         if (!delResult) {
             return Result<void, std::error_code>::failure(
                 delResult.error());
         }
+        fdContexts.erase(fdIt);
 
-        fdContexts.erase(it);
+        auto conIt = connections.find(fd);
+        if (conIt != connections.end())
+            connections.erase(conIt);
+
         return Result<void, std::error_code>::success();
     }
 
@@ -187,10 +190,9 @@ private:
 private:
     Epoller epoller;
     EventNotifier eventNotifier;
-    std::vector<TcpConnection> connections; // 管理的连接，暂时用vector
     TimerQueue timerQueue;
-
-    std::unordered_map<int, FdContext> fdContexts;
+    std::unordered_map<int, FdContext> fdContexts {};
+    std::unordered_map<int, std::shared_ptr<TcpConnection>> connections {};
 
     bool running{false};
 };

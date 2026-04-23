@@ -5,35 +5,67 @@
 #include <coroflow/IoLoopSelector.hpp>
 #include <coroflow/EventLoopThreadPool.hpp>
 #include <coroflow/SocketAddress.hpp>
+#include <coroflow/Result.hpp>
 
-#include <string>
-#include <cstdint>
+#include <system_error>
+
+
+
 namespace coroflow {
+
+namespace {
+
+}
+
 class TcpServer {
 public:
-    explicit TcpServer(SocketAddress listenAddress, size_t threadNums )
-        :acceptor() {
+    static Result<TcpServer, std::error_code> create(const SocketAddress& listenAddress,
+                                                     size_t threadNums) {
+        auto accpetorResult = TcpAcceptor::create();
+        if (!accpetorResult) {
+            return Result<TcpServer, std::error_code>::failure(
+                accpetorResult.error());
+        }
 
+        auto loopResult = EventLoop::create();
+        if (!loopResult) {
+            return Result<TcpServer, std::error_code>::failure(
+                loopResult.error());
+        }
+        accpetorResult.value().listen(listenAddress);
+
+        // TODO: threadNums
+        return Result<TcpServer, std::error_code>::success(
+            TcpServer(std::move(accpetorResult).value(), std::move(loopResult).value() ));
     }
 
     ~TcpServer() {
 
     }
 
+    TcpServer (const TcpServer&) = delete;
+    TcpServer& operator=(const TcpServer&) = delete;
+
+    TcpServer (TcpServer&&) = default;
+    TcpServer& operator=(TcpServer&&) = default;
+
     void run() {
 
     }
 
-    TcpServer (const TcpServer&) = delete;
-    TcpServer& operator=(const TcpServer&) = delete;
+    void stop() {
 
-    TcpServer (TcpServer&&) = delete;
-    TcpServer& operator=(TcpServer&&) = delete;
+    }
 
+private:
+    explicit TcpServer(TcpAcceptor&& acceptor, EventLoop&& mainLoop)
+        :acceptor(std::move(acceptor)), mainLoop(std::move(mainLoop)) {
+
+    }
 private:
     TcpAcceptor acceptor;
     EventLoop mainLoop;
-    IoLoopSelector selector;
+    IoLoopSelector selector{};
     EventLoopThreadPool workerThreadPool;
 };
 }

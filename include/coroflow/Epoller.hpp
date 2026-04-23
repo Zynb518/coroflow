@@ -51,8 +51,7 @@ public:
         epoll_event ev{};
         ev.events = events;
         ev.data.fd = fd;
-        int ret = ::epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &ev);
-        if (ret == -1) {
+        int ret = ::epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &ev);if (ret == -1) {
             return Result<void, std::error_code>::failure(
                 std::error_code(errno, std::generic_category()));
         }
