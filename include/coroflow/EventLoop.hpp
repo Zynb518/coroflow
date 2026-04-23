@@ -13,6 +13,8 @@
 #include <unordered_map>
 #include <utility>
 #include <memory>
+#include <mutex>
+#include <deque>
 
 #include "FdContext.hpp"
 
@@ -181,6 +183,14 @@ public:
         return Result<void, std::error_code>::success();
     }
 
+    // 跨线程投递能力
+    void pushConnfd(int connFd) {
+        {
+            std::lock_guard lock(pendingConnFdsMutex);
+            penddingConnFds.push_back(connFd);
+        }
+        eventNotifier.notify();
+    }
 
 private:
     explicit EventLoop(Epoller &&epoller, EventNotifier &&notifier)
@@ -193,6 +203,9 @@ private:
     TimerQueue timerQueue;
     std::unordered_map<int, FdContext> fdContexts {};
     std::unordered_map<int, std::shared_ptr<TcpConnection>> connections {};
+
+    std::mutex pendingConnFdsMutex;
+    std::deque<int> penddingConnFds;
 
     bool running{false};
 };

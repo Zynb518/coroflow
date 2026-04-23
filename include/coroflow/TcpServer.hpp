@@ -10,7 +10,6 @@
 #include <system_error>
 
 
-
 namespace coroflow {
 
 namespace {
@@ -32,11 +31,16 @@ public:
             return Result<TcpServer, std::error_code>::failure(
                 loopResult.error());
         }
-        accpetorResult.value().listen(listenAddress);
+        auto listenResult = accpetorResult.value().listen(listenAddress);
+        if (!listenResult) {
+            return Result<TcpServer, std::error_code>::failure(
+                listenResult.error());
+        }
+
 
         // TODO: threadNums
         return Result<TcpServer, std::error_code>::success(
-            TcpServer(std::move(accpetorResult).value(), std::move(loopResult).value() ));
+            TcpServer(std::move(accpetorResult).value(), std::move(loopResult).value(), threadNums ));
     }
 
     ~TcpServer() {
@@ -53,19 +57,21 @@ public:
 
     }
 
+
     void stop() {
 
     }
 
 private:
-    explicit TcpServer(TcpAcceptor&& acceptor, EventLoop&& mainLoop)
-        :acceptor(std::move(acceptor)), mainLoop(std::move(mainLoop)) {
+    explicit TcpServer(TcpAcceptor&& acceptor, EventLoop&& mainLoop, size_t threadNums)
+        :acceptor(std::move(acceptor)), mainLoop(std::move(mainLoop)), selector(threadNums) {
 
     }
 private:
     TcpAcceptor acceptor;
     EventLoop mainLoop;
-    IoLoopSelector selector{};
+    IoLoopSelector selector;
     EventLoopThreadPool workerThreadPool;
+
 };
 }

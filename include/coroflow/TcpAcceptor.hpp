@@ -24,13 +24,11 @@ public:
 
         // true 表示挂起， false 表示不要挂起
         bool await_suspend(std::coroutine_handle<> handle) noexcept {
-            std::cout << "co_await 之后，注册协程句柄 \n";
             auto result = mainLoop.addReadEvent(socket.fd(), handle);
             if (!result) {
                 pendingError = result.error();
                 return false;
             }
-            std::cout << "return true 挂起 \n";
             return true;
         }
 
