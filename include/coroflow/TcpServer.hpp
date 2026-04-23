@@ -13,19 +13,16 @@
 #include <memory>
 #include <coroflow/Task.hpp>
 #include <coroflow/TcpConnection.hpp>
-
+#include <coroflow/Logger.hpp>
 
 namespace coroflow {
-
-namespace {
-
-}
 
 class TcpServer {
 public:
     using ConnectionHandler =
         std::function<Task<void> (std::shared_ptr<TcpConnection>, EventLoop&) >;
 
+    // 工厂函数
     static Result<TcpServer, std::error_code> create(const SocketAddress& listenAddress,
                                                      size_t threadNums) {
         auto accpetorResult = TcpAcceptor::create();
@@ -45,14 +42,12 @@ public:
                 listenResult.error());
         }
 
-
-        // TODO: threadNums
         return Result<TcpServer, std::error_code>::success(
             TcpServer(std::move(accpetorResult).value(), std::move(loopResult).value(), threadNums ));
     }
 
     ~TcpServer() {
-
+        stop();
     }
 
     TcpServer (const TcpServer&) = delete;
@@ -71,22 +66,45 @@ public:
             if (!acceptResult) continue;
 
             int connFd = acceptResult.value();
-            dispatchConnFd(connFd);
+            auto dispatchResult = dispatchConnFd(connFd);
+            if (!dispatchResult) {
+                LOG_ERROR << "分发连接文件描述符失败";
+                ::close(connFd);
+                continue;
+            }
         }
     }
 
-    void dispatchConnFd(int connFd) {
-        size_t index = selector.next();
-        EventLoop& ioLoop = workerThreadPool.getLoop(index);
-        ioLoop.pushConnfd(connFd);
-    }
 
-    void run() {
 
+    Result<void, std::error_code> run() {
+        auto poolRunResult = workerThreadPool.run();
+        if (!poolRunResult) {
+            return Result<void, std::error_code>::failure(
+                poolRunResult.error());
+        }
+
+        acceptTask = acceptLoop();
+        acceptTask.resume(); // 推进到第一次 co_await accept
+
+        mainLoop.run(); // 主线程开始跑 accept loop
+
+        return Result<void, std::error_code>::success();
     }
 
     void stop() {
-
+        mainLoop.stop();
+        workerThreadPool.stop();
+    }
+private:
+    Result<void, std::error_code> dispatchConnFd(int connFd) {
+        size_t index = selector.next();
+        auto pushResult = workerThreadPool.pushConnfd(index, connFd);
+        if (!pushResult) {
+            return Result<void, std::error_code>::failure(
+                pushResult.error());
+        }
+        return Result<void, std::error_code>::success();
     }
 
 private:
@@ -101,5 +119,6 @@ private:
     EventLoopThreadPool workerThreadPool;
 
     ConnectionHandler connectionHandler;
+    Task<void> acceptTask; // TcpServer 的长期后台任务，与TcpServer同生死
 };
 }

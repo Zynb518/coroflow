@@ -39,6 +39,8 @@ target_sources(coroflow
 
         include/coroflow/Result.hpp
 
+        include/coroflow/Logger.hpp
+
 
 )
 
