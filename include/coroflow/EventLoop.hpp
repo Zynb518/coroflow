@@ -25,8 +25,30 @@ public:
     EventLoop(const EventLoop&) = delete;
     EventLoop& operator=(const EventLoop&) = delete;
 
-    EventLoop(EventLoop &&) = default;
-    EventLoop& operator=(EventLoop &&) = default;
+    EventLoop(EventLoop &&other) noexcept
+        : epoller(std::move(other.epoller)),
+          eventNotifier(std::move(other.eventNotifier)),
+          timerQueue(std::move(other.timerQueue)),
+          fdContexts(std::move(other.fdContexts)),
+          connections(std::move(other.connections)),
+          running(other.running) {
+    }
+
+    EventLoop &operator=(EventLoop &&other) noexcept {
+        if (this == &other) {
+            return *this;
+        }
+
+        epoller = std::move(other.epoller);
+        eventNotifier = std::move(other.eventNotifier);
+        timerQueue = std::move(other.timerQueue);
+        fdContexts = std::move(other.fdContexts);
+        connections = std::move(other.connections);
+        running = other.running;
+
+        return *this;
+    }
+
 
     // 工厂函数
     static Result<EventLoop, std::error_code> create() {
