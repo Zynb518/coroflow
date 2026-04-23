@@ -9,6 +9,11 @@
 
 #include <system_error>
 
+#include <functional>
+#include <memory>
+#include <coroflow/Task.hpp>
+#include <coroflow/TcpConnection.hpp>
+
 
 namespace coroflow {
 
@@ -18,6 +23,9 @@ namespace {
 
 class TcpServer {
 public:
+    using ConnectionHandler =
+        std::function<Task<void> (std::shared_ptr<TcpConnection>, EventLoop&) >;
+
     static Result<TcpServer, std::error_code> create(const SocketAddress& listenAddress,
                                                      size_t threadNums) {
         auto accpetorResult = TcpAcceptor::create();
@@ -53,10 +61,29 @@ public:
     TcpServer (TcpServer&&) = default;
     TcpServer& operator=(TcpServer&&) = default;
 
+    void setConnectionHandler(ConnectionHandler handler) {
+        connectionHandler = std::move(handler);
+    }
+
+    Task<void> acceptLoop() {
+        for (;;) {
+            auto acceptResult = co_await acceptor.accept(mainLoop);
+            if (!acceptResult) continue;
+
+            int connFd = acceptResult.value();
+            dispatchConnFd(connFd);
+        }
+    }
+
+    void dispatchConnFd(int connFd) {
+        size_t index = selector.next();
+        EventLoop& ioLoop = workerThreadPool.getLoop(index);
+        ioLoop.pushConnfd(connFd);
+    }
+
     void run() {
 
     }
-
 
     void stop() {
 
@@ -73,5 +100,6 @@ private:
     IoLoopSelector selector;
     EventLoopThreadPool workerThreadPool;
 
+    ConnectionHandler connectionHandler;
 };
 }

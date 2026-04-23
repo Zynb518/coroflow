@@ -28,7 +28,6 @@ target_sources(coroflow
         include/coroflow/IoLoopSelector.hpp
 
         include/coroflow/EventLoopThreadPool.hpp
-        include/coroflow/EventLoopThread.hpp
         include/coroflow/EventLoop.hpp
         include/coroflow/Epoller.hpp
         include/coroflow/FdContext.hpp
