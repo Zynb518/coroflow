@@ -27,11 +27,14 @@ target_sources(coroflow
 
         include/coroflow/IoLoopSelector.hpp
 
+        include/coroflow/TcpSession.hpp
+
         include/coroflow/EventLoopThreadPool.hpp
         include/coroflow/EventLoop.hpp
         include/coroflow/Epoller.hpp
         include/coroflow/FdContext.hpp
         include/coroflow/TcpConnection.hpp
+        include/coroflow/TcpConnectionAwaiter.hpp
         include/coroflow/EventNotifier.hpp
         include/coroflow/TimerQueue.hpp
 

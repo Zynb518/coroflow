@@ -667,3 +667,16 @@ extern int setsockopt (int __fd, int __level, int __optname,
 ```
 
 放到你这句里逐个看：listen_fd 是要设置选项的那个 socket 文件描述符；SOL_SOCKET 表示“这个选项属于 socket 通用层”，不是 TCP 专属层、也不是IP 专属层；SO_REUSEADDR 是具体要设置的选项名，表示允许重用本地地址，开发时对服务器重启特别常见；&optval 是选项值的地址，你这里通常传一个 int optval = 1 表示打开，传 0 表示关闭；sizeof(optval) 就是这个值占多少字节，让内核知道该从用户态拷贝多大一块数据。换句话说，这句代码的自然语言就是：“对listen_fd 这个 socket，在 socket 通用层上，把 SO_REUSEADDR 这个选项设置成开启”。
+
+
+
+```cpp
+/* Shut down all or part of the connection open on socket FD.
+   HOW determines what to shut down:
+     SHUT_RD   = No more receptions;
+     SHUT_WR   = No more transmissions;
+     SHUT_RDWR = No more receptions or transmissions.
+   Returns 0 on success, -1 for errors.  */
+extern int shutdown (int __fd, int __how) __THROW;
+```
+

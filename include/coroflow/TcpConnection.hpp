@@ -3,9 +3,17 @@
 #include <coroflow/Result.hpp>
 #include <coroflow/Buffer.hpp>
 
+#include <coroutine>
 #include <system_error>
 #include <unistd.h>
+#include <cerrno>
+#include <sys/socket.h>
+
 namespace coroflow {
+
+class EventLoop;
+
+
 // 不需要工厂函数，因为是由外部注入构造的
 class TcpConnection {
 public:
@@ -29,39 +37,131 @@ public:
             ::close(fd_);
     }
 
+    struct ReadAwaiter {
+        TcpConnection& conn_;
+        EventLoop& loop_;
+        std::error_code pendingError_;
+
+        bool await_ready() const noexcept;
+        bool await_suspend(std::coroutine_handle<> handle) noexcept;
+        Result<size_t, std::error_code> await_resume() noexcept;
+    };
+
     int fd() const noexcept {
         return fd_;
     }
-
-    Buffer& readBuffer() noexcept {
-        return readBuffer_;
-    }
-
-    const Buffer& readBuffer() const noexcept {
-        return readBuffer_;
-    }
-
-    Buffer& writeBuffer() noexcept {
-        return writeBuffer_;
-    }
-
-    const Buffer& writeBuffer() const noexcept {
-        return writeBuffer_;
-    }
-
 
     State state() const noexcept {
         return state_;
     }
 
-    Result<size_t, std::error_code> readFromFd() noexcept;
+    size_t readableBytes() const noexcept {
+        return readBuffer_.readable();
+    }
 
-    Result<size_t, std::error_code> writeToFd() noexcept;
+    bool hasPendingWrite() const noexcept {
+        return !writeBuffer_.empty();
+    }
 
-    void shutdownWrite() noexcept;
+    std::string retrieve(size_t len) {
+        return readBuffer_.retrieve(len);
+    }
 
-    void close() noexcept;
+    std::string retrieveAll() {
+        return readBuffer_.retrieveAll();
+    }
 
+    std::string_view peekReadable() const noexcept {
+        return {readBuffer_.peek(), readBuffer_.readable()};
+    }
+
+    void appendWrite(std::string_view data) {
+        writeBuffer_.append(data.data(), data.size());
+    }
+
+
+    // 接受客户端的消息
+    Result<size_t, std::error_code> readFromFd() noexcept {
+        if (fd_ == -1) {
+            return Result<size_t, std::error_code>::failure(
+                std::make_error_code(std::errc::bad_file_descriptor));
+        }
+
+        for (;;) {
+            ssize_t n = readBuffer_.readFromFd(fd_);
+            if (n > 0) {
+                return Result<size_t, std::error_code>::success(
+                    static_cast<size_t>(n));
+            }
+
+            if (n == 0) {
+                state_ = State::Disconnected;
+                return Result<size_t, std::error_code>::success(
+                    static_cast<size_t>(0));
+            }
+
+            if (errno == EINTR)
+                continue;
+
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                return Result<size_t, std::error_code>::failure(
+                    std::make_error_code(std::errc::resource_unavailable_try_again));
+            }
+
+            return Result<size_t, std::error_code>::failure(
+                std::error_code(errno, std::generic_category()));
+        }
+    }
+
+    // 给客户端发送消息
+    Result<size_t, std::error_code> writeToFd() noexcept {
+        if (fd_ == -1) {
+            return Result<size_t, std::error_code>::failure(
+                std::make_error_code(std::errc::bad_file_descriptor));
+        }
+
+        if (writeBuffer_.empty()) {
+            return Result<size_t, std::error_code>::success(
+                static_cast<size_t>(0));
+        }
+
+        for (;;) {
+            ssize_t n = writeBuffer_.writeToFd(fd_);
+            if (n >= 0) {
+                return Result<size_t, std::error_code>::success(
+                    static_cast<size_t>(n));
+            }
+
+            if (errno == EINTR)
+                continue;
+
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                return Result<size_t, std::error_code>::failure(
+                    std::make_error_code(std::errc::resource_unavailable_try_again));
+            }
+            return Result<size_t, std::error_code>::failure(
+                std::error_code(errno, std::generic_category()));
+        }
+    }
+
+    void shutdownWrite() noexcept {
+        if (fd_ == -1)
+            return;
+
+        if (state_ != State::Connected)
+            return;
+
+        if (::shutdown(fd_, SHUT_WR) == 0)
+            state_ = State::Disconnecting;
+    }
+
+    void close() noexcept {
+        if (fd_ != -1) {
+            ::close(fd_);
+            fd_ = -1;
+        }
+        state_ = State::Disconnected;
+    }
 
 private:
     int fd_{-1};

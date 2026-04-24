@@ -116,13 +116,8 @@ public:
                 }
             } // for
 
-            // 处理 fd 添加连接
-            {
-                std::lock_guard lock(pendingConnFdsMutex_);
-                for (int fd : penddingConnFds_) {
-
-                }
-            }
+            // 处理 fd 添加连接 , 内部加锁
+            handlePendingConnFds();
 
         } // while
     }
@@ -222,6 +217,38 @@ public:
         }
         notifier_.notify();
     }
+
+    // 是否管理某个连接
+    bool hasConnection(int fd) const noexcept {
+        return connections_.find(fd) != connections_.end();
+    }
+
+    std::shared_ptr<TcpConnection> findConnection(int fd) const {
+        auto it = connections_.find(fd);
+        if (it == connections_.end())
+            return nullptr;
+
+        return it->second;
+    }
+
+private:
+    // 处理投递过来的连接
+    void handlePendingConnFds() noexcept {
+        std::deque<int> pendingFds;
+        {
+            std::lock_guard lock(pendingConnFdsMutex_);
+            pendingFds.swap(penddingConnFds_);
+        }
+        for (int fd : pendingFds) {
+            if (fd == -1)
+                continue;
+
+            auto conn = std::make_shared<TcpConnection>(fd);
+            connections_[fd] = std::move(conn);
+        }
+
+    }
+
 
 private:
     explicit EventLoop(Epoller &&epoller, EventNotifier &&notifier)
