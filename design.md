@@ -260,6 +260,41 @@ std::variant<T, E> storage_;
 
 
 
+### 8. 常见坑
+
+```cpp
+std::variant<int, int> v;
+```
+
+这种写法要避免。重复类型会让按类型访问变得不明确。
+
+```cpp
+std::get<T>(v)
+```
+
+不要在没判断的情况下乱用，否则类型不匹配就抛异常。
+
+```cpp
+std::variant<Heavy, Error> v;
+```
+
+如果类型对象很重，赋值时可能发生移动构造或拷贝构造，要注意代价，但对你的 `TcpSocket` 这种 move-only RAII 类型是可以用的。
+
+`std::variant` 不能拿来装引用类型，这点也要知道；如果真要表达引用关系，通常放指针或 `std::reference_wrapper`。
+
+### 9. 接口总结
+
+你现在先只吃透这几个就够了：
+
+- `std::variant<T, E>`
+- `std::holds_alternative<T>(v)`
+- `std::get<T>(v)`
+- `std::get_if<T>(&v)`
+- `v.emplace<T>(...)`
+- `std::visit(...)`
+
+
+
 ## std::memmove()
 
 ```cpp
@@ -304,38 +339,7 @@ static_assert(!std::is_same_v<T, E>);
 
 因为如果 `T` 和 `E` 是同一个类型，比如都是 `int`，那 `std::variant<int, int>` 虽然语法上可以存在，但你用 `holds_alternative<int>` 或 `get<int>` 就会变得歧义，完全不适合 `Result`。
 
-### 8. 常见坑
 
-```cpp
-std::variant<int, int> v;
-```
-
-这种写法要避免。重复类型会让按类型访问变得不明确。
-
-```cpp
-std::get<T>(v)
-```
-
-不要在没判断的情况下乱用，否则类型不匹配就抛异常。
-
-```cpp
-std::variant<Heavy, Error> v;
-```
-
-如果类型对象很重，赋值时可能发生移动构造或拷贝构造，要注意代价，但对你的 `TcpSocket` 这种 move-only RAII 类型是可以用的。
-
-`std::variant` 不能拿来装引用类型，这点也要知道；如果真要表达引用关系，通常放指针或 `std::reference_wrapper`。
-
-### 9. 接口总结
-
-你现在先只吃透这几个就够了：
-
-- `std::variant<T, E>`
-- `std::holds_alternative<T>(v)`
-- `std::get<T>(v)`
-- `std::get_if<T>(&v)`
-- `v.emplace<T>(...)`
-- `std::visit(...)`
 
 ## std::exchange
 

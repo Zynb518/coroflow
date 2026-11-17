@@ -25,21 +25,18 @@ public:
     }
 
     void log(LogLevel level, const std::string& message) {
-        std::lock_guard<std::mutex> lock(mutex);
+        std::lock_guard<std::mutex> lock(mutex_);
         std::ostream& out = (level == LogLevel::Error) ? std::cerr : std::cout;
 
         out << '[' << currentTime() << "] "
             << '[' << levelToString(level) << "] "
             << "[TID:" << std::this_thread::get_id() << "] "
-            << message << '\n';
+            << message << '\n'
+            << std::flush;
     }
 
 private:
-    Logger() {
-        std::ios::sync_with_stdio(false);
-        std::cin.tie(nullptr);
-        std::cerr.tie(nullptr);
-    }
+    Logger() = default;
 
     static const char* levelToString(LogLevel level) noexcept {
         switch (level) {
@@ -74,41 +71,48 @@ private:
     }
 
 private:
-    std::mutex mutex;
+    std::mutex mutex_;
 };
 
 class LogStream {
 public:
     explicit LogStream(LogLevel level) noexcept
-        : level(level) {
+        : level_(level) {
     }
 
     LogStream(const LogStream&) = delete;
     LogStream& operator=(const LogStream&) = delete;
 
     LogStream(LogStream&& other) noexcept
-        : level(other.level),
-          oss(std::move(other.oss)) {
+        : level_(other.level_),
+          oss_(std::move(other.oss_)),
+          active_(other.active_) {
+        other.active_ = false;
     }
 
     ~LogStream() {
-        Logger::instance().log(level, oss.str());
+        if (!active_) {
+            return;
+        }
+
+        Logger::instance().log(level_, oss_.str());
     }
 
     template<typename T>
     LogStream& operator<<(const T& value) {
-        oss << value;
+        oss_ << value;
         return *this;
     }
 
     LogStream& operator<<(std::ostream& (*manip)(std::ostream&)) {
-        oss << manip;
+        oss_ << manip;
         return *this;
     }
 
 private:
-    LogLevel level;
-    std::ostringstream oss;
+    LogLevel level_;
+    std::ostringstream oss_;
+    bool active_{true};
 };
 
 } // namespace coroflow

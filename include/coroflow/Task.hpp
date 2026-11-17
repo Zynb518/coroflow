@@ -23,7 +23,7 @@ public:
     Task& operator=(const Task&) = delete;
 
     Task(Task&& other) noexcept
-        :handle_(std::exchange(other.handle, {})) {}
+        :handle_(std::exchange(other.handle_, {})) {}
 
     Task& operator=(Task&& other) noexcept {
         if (this == &other)
@@ -32,7 +32,7 @@ public:
         if (handle_)
             handle_.destroy();
 
-        handle_ = std::exchange(other.handle, {});
+        handle_ = std::exchange(other.handle_, {});
         return *this;
     }
 

@@ -5,6 +5,7 @@
 #include <coroflow/EventNotifier.hpp>
 #include <coroflow/TimerQueue.hpp>
 #include <coroflow/Result.hpp>
+#include <coroflow/Task.hpp>
 
 #include <array>
 #include <coroutine>
@@ -15,6 +16,7 @@
 #include <memory>
 #include <mutex>
 #include <deque>
+#include <algorithm>
 
 #include "FdContext.hpp"
 
@@ -22,32 +24,37 @@ namespace coroflow {
 
 class EventLoop {
 public:
+    using NewConnectionCallback =
+        std::function<void(std::shared_ptr<TcpConnection>, EventLoop&)>;
+
     EventLoop(const EventLoop&) = delete;
     EventLoop& operator=(const EventLoop&) = delete;
 
     EventLoop(EventLoop &&other) noexcept
-        : epoller_(std::move(other.epoller_)),
-          notifier_(std::move(other.notifier_)),
-          timerQueue_(std::move(other.timerQueue_)),
-          fdContexts_(std::move(other.fdContexts_)),
-          connections_(std::move(other.connections_)),
-          running_(other.running_) {
+      : epoller_(std::move(other.epoller_)),
+        notifier_(std::move(other.notifier_)),
+        timerQueue_(std::move(other.timerQueue_)),
+        fdContexts_(std::move(other.fdContexts_)),
+        connections_(std::move(other.connections_)),
+        newConnectionCallback_(std::move(other.newConnectionCallback_)),
+        running_(other.running_) {
     }
 
     EventLoop &operator=(EventLoop &&other) noexcept {
-        if (this == &other) {
+        if (this == &other)
             return *this;
-        }
 
         epoller_ = std::move(other.epoller_);
         notifier_ = std::move(other.notifier_);
         timerQueue_ = std::move(other.timerQueue_);
         fdContexts_ = std::move(other.fdContexts_);
         connections_ = std::move(other.connections_);
+        newConnectionCallback_ = std::move(other.newConnectionCallback_);
         running_ = other.running_;
 
         return *this;
     }
+
 
 
     // 工厂函数
@@ -231,6 +238,11 @@ public:
         return it->second;
     }
 
+    void setNewConnectionCallback(NewConnectionCallback callback) {
+        newConnectionCallback_ = std::move(callback);
+    }
+
+
 private:
     // 处理投递过来的连接
     void handlePendingConnFds() noexcept {
@@ -244,9 +256,12 @@ private:
                 continue;
 
             auto conn = std::make_shared<TcpConnection>(fd);
-            connections_[fd] = std::move(conn);
-        }
+            connections_[fd] = conn;
 
+            if (newConnectionCallback_)
+                newConnectionCallback_(conn, *this);
+
+        }
     }
 
 
@@ -264,6 +279,8 @@ private:
 
     std::mutex pendingConnFdsMutex_;
     std::deque<int> penddingConnFds_;
+
+    NewConnectionCallback newConnectionCallback_;
 
     bool running_{false};
 };

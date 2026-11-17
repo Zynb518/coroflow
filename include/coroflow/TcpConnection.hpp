@@ -37,16 +37,6 @@ public:
             ::close(fd_);
     }
 
-    struct ReadAwaiter {
-        TcpConnection& conn_;
-        EventLoop& loop_;
-        std::error_code pendingError_;
-
-        bool await_ready() const noexcept;
-        bool await_suspend(std::coroutine_handle<> handle) noexcept;
-        Result<size_t, std::error_code> await_resume() noexcept;
-    };
-
     int fd() const noexcept {
         return fd_;
     }

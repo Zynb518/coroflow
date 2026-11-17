@@ -87,8 +87,7 @@ public:
     // 写入数据
     void append(const char* data, size_t len) {
         checkInvariants();
-        assert(data == nullptr && len == 0);
-
+        assert(data != nullptr || len == 0);
         ensureWritable(len);
         std::memcpy(buffer_.data() + writePos_, data, len);
         writePos_ += len;

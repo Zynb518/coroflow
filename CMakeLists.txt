@@ -34,11 +34,11 @@ target_sources(coroflow
         include/coroflow/Epoller.hpp
         include/coroflow/FdContext.hpp
         include/coroflow/TcpConnection.hpp
-        include/coroflow/TcpConnectionAwaiter.hpp
         include/coroflow/EventNotifier.hpp
         include/coroflow/TimerQueue.hpp
 
         include/coroflow/Task.hpp
+        include/coroflow/FdAwaiter.hpp
 
         include/coroflow/Result.hpp
 
